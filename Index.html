@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Vertical Locações - Oficina Smart v20.62</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffcc00">
+    
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        /* --- CSS Inalterado (mantido do original) --- */
+        :root {
+            --primary: #ffcc00;
+            --bg-body: #020617;
+            --bg-sidebar: #0f172a;
+            --bg-card: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --input-bg: #020617;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="light"] {
+            --primary: #d97706;
+            --bg-body: #f1f5f9;
+            --bg-sidebar: #ffffff;
+            --bg-card: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #cbd5e1;
+            --input-bg: #f8fafc;
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; padding: 0; background-color: var(--bg-body); color: var(--text-main); font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; transition: background-color 0.3s, color 0.3s; }
+
+        #loader { position: fixed; inset: 0; z-index: 9999; background: #000; display: flex; flex-direction: column; transition: opacity 0.8s; }
+        .loader-bg { position: absolute; inset: 0; background: url('https://images.unsplash.com/photo-1579412691525-46f34a06700c?q=80&w=1470&auto=format&fit=crop') center/cover; opacity: 0.4; animation: zoomBG 20s infinite alternate; }
+        @keyframes zoomBG { from { transform: scale(1); } to { transform: scale(1.1); } }
+        .loader-content { position: relative; z-index: 2; top: 15%; left: 5%; }
+        .loader-title { font-size: 3rem; font-weight: 900; border-left: 8px solid var(--primary); padding-left: 20px; text-transform: uppercase; letter-spacing: 5px; margin: 0; color: #fff; }
+        .loader-bar-box { position: absolute; bottom: 50px; right: 50px; width: 300px; z-index: 2; }
+        .loader-bar { height: 5px; background: rgba(255,255,255,0.1); margin-top: 10px; border-radius: 3px; overflow: hidden; }
+        .loader-fill { height: 100%; width: 0%; background: var(--primary); transition: width 0.3s; }
+
+        #auth-view { position: fixed; inset: 0; z-index: 5000; background: var(--bg-body); display: none; align-items: center; justify-content: center; padding: 20px; }
+        .auth-card { background: var(--bg-card); padding: 30px; border-radius: 16px; width: 100%; max-width: 400px; border: 1px solid var(--primary); box-shadow: var(--shadow); }
+        .auth-title { color: var(--primary); text-align: center; margin-bottom: 20px; letter-spacing: 2px; }
+
+        #app-view { width: 100vw; height: 100vh; display: flex; }
+        
+        .sidebar { width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; transition: transform 0.3s; z-index: 1000; }
+        .brand-area { padding: 25px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .brand-text { color: var(--primary); font-weight: 900; font-size: 1.4rem; letter-spacing: 1px; }
+        
+        .nav-list { list-style: none; padding: 20px 10px; margin: 0; flex: 1; }
+        .nav-btn { width: 100%; padding: 15px; margin-bottom: 5px; background: transparent; color: var(--text-muted); border: none; text-align: left; cursor: pointer; font-weight: 600; border-radius: 8px; display: flex; align-items: center; gap: 10px; transition: 0.2s; }
+        .nav-btn:hover { background: rgba(125,125,125,0.1); color: var(--text-main); }
+        .nav-btn.active { background: var(--primary); color: #000; font-weight: 800; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        
+        .user-area { padding: 20px; border-top: 1px solid var(--border); }
+        .user-email { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px; display: block; overflow: hidden; text-overflow: ellipsis; }
+        .delete-account-btn { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 8px; font-size: 0.75rem; border-radius: 4px; margin-top: 10px; cursor: pointer; transition: 0.2s; width: 100%; }
+        .delete-account-btn:hover { background: var(--danger); color: #fff; }
+
+        .main-content { flex: 1; overflow-y: auto; padding: 20px; position: relative; background: var(--bg-body); transition: background-color 0.3s; }
+        .section { display: none; animation: slideUp 0.4s ease; max-width: 1100px; margin: 0 auto; }
+        .section.active { display: block; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow); transition: background-color 0.3s; }
+        
+        input, select { width: 100%; padding: 12px; margin-top: 8px; background: var(--input-bg); border: 1px solid var(--border); color: var(--text-main); border-radius: 8px; font-size: 16px; outline: none; transition: 0.3s; }
+        input:focus, select:focus { border-color: var(--primary); }
+        
+        label { color: var(--text-muted); font-size: 0.85rem; font-weight: 700; margin-top: 15px; display: block; }
+        
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; margin-top: 15px; text-transform: uppercase; transition: 0.2s; position: relative; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-primary { background: var(--primary); color: #000; }
+        .btn-success { background: var(--success); color: #fff; }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-warning { background: var(--warning); color: #fff; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+        .btn-theme { background: transparent; border: 1px solid var(--border); color: var(--primary); width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .kpi-box { background: rgba(125,125,125,0.05); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid var(--border); }
+        .kpi-val { font-size: 1.8rem; font-weight: 800; color: var(--primary); margin: 5px 0; }
+        .kpi-lbl { font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 1px; }
+
+        .timer-display { font-family: monospace; font-size: 2.5rem; text-align: center; color: var(--success); font-weight: bold; margin: 10px 0; text-shadow: 0 0 20px rgba(34,197,94,0.3); }
+
+        .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th { background: rgba(125,125,125,0.1); color: var(--primary); padding: 12px; text-align: left; white-space: nowrap; }
+        td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+
+        .mobile-header { display: none; padding: 15px; background: var(--bg-sidebar); border-bottom: 1px solid var(--border); align-items: center; justify-content: space-between; z-index: 1001; position: relative; }
+        .menu-toggle { background: none; border: 1px solid var(--primary); color: var(--primary); padding: 5px 10px; border-radius: 4px; font-weight: bold; }
+        
+        #sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; }
+        #sidebar-backdrop.active { display: block; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 6000; display: none; align-items: center; justify-content: center; opacity: 0; transition: 0.3s; }
+        .modal-overlay.open { display: flex; opacity: 1; }
+        .modal-card { background: var(--bg-card); width: 90%; max-width: 400px; padding: 25px; border-radius: 16px; border: 1px solid var(--primary); box-shadow: 0 0 20px rgba(0,0,0,0.5); transform: scale(0.8); transition: 0.3s; }
+        .modal-overlay.open .modal-card { transform: scale(1); }
+        .modal-title { color: var(--primary); font-size: 1.5rem; font-weight: 900; margin-bottom: 15px; text-align: center; }
+        .modal-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.9rem; }
+        .modal-row span { color: var(--text-main); font-weight: bold; text-align: right; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 25px; }
+        
+        .filter-bar { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px; }
+        .filter-bar > div { flex: 1; margin-top: 0; }
+        .filter-bar label { margin-top: 0; font-size: 0.75rem; }
+
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; height: 100%; left: -260px; top: 0; box-shadow: 5px 0 20px rgba(0,0,0,0.5); }
+            .sidebar.active { transform: translateX(260px); }
+            .mobile-header { display: flex; }
+            .main-content { padding-top: 10px; }
+            #sidebar-backdrop.active { display: block; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- LOADING -->
+    <div id="loader">
+        <div class="loader-bg"></div>
+        <div class="loader-content">
+            <h1 class="loader-title">VERTICAL</h1>
+            <p style="color:var(--primary); margin-left:22px; letter-spacing:3px; font-weight:bold;">OFICINA SMART v20.62</p>
+        </div>
+        <div class="loader-bar-box">
+            <div style="text-align:right; font-size:10px; color:#aaa; margin-bottom:5px;">CARREGANDO MÓDULOS...</div>
+            <div class="loader-bar"><div class="loader-fill" id="progress"></div></div>
+        </div>
+    </div>
+
+    <!-- AUTH -->
+    <div id="auth-view">
+        <div class="auth-card" id="form-login">
+            <h2 class="auth-title">LOGIN</h2>
+            <input type="email" id="login-email" placeholder="E-mail" autocomplete="email">
+            <input type="password" id="login-pass" placeholder="Senha" autocomplete="current-password">
+            <button class="btn btn-primary" onclick="doLogin()" id="btn-login">ENTRAR</button>
+            <button class="btn btn-outline" style="border:none; margin-top:10px; font-size:0.8rem;" onclick="toggleAuth(true)">Criar Nova Empresa</button>
+        </div>
+
+        <!-- FORMULÁRIO DE CADASTRO MODIFICADO (com campos de API) -->
+        <div class="auth-card" id="form-register" style="display:none;">
+            <h2 class="auth-title">NOVA EMPRESA</h2>
+            <input type="text" id="reg-empresa" placeholder="Nome da Empresa">
+            <input type="email" id="reg-email" placeholder="E-mail Admin">
+            <input type="password" id="reg-pass" placeholder="Senha (min 6)">
+            <input type="password" id="reg-token" placeholder="Token de Segurança" style="border-color:var(--primary)">
+            
+            <!-- NOVOS CAMPOS -->
+            <label style="margin-top:15px;">URL da API (para integrações)</label>
+            <input type="url" id="reg-api-url" placeholder="https://sua-api.com/endpoint">
+            
+            <label>Chave da API</label>
+            <input type="text" id="reg-api-key" placeholder="Chave secreta">
+            <!-- FIM NOVOS CAMPOS -->
+            
+            <button class="btn btn-success" onclick="doRegister()" id="btn-register">CADASTRAR</button>
+            <button class="btn btn-outline" style="border:none; margin-top:10px;" onclick="toggleAuth(false)">Voltar</button>
+        </div>
+    </div>
+
+    <!-- MOBILE HEADER -->
+    <div id="mobile-header" class="mobile-header">
+        <span style="color:var(--primary); font-weight:900;">VERTICAL</span>
+        <div style="display:flex; gap:10px;">
+            <button class="btn-theme" onclick="toggleTheme()" id="btn-theme-mobile">☀</button>
+            <button class="menu-toggle" onclick="toggleSidebar()">MENU</button>
+        </div>
+    </div>
+
+    <!-- APP -->
+    <div id="app-view">
+        <div id="sidebar-backdrop" onclick="closeSidebar()"></div>
+        
+        <aside class="sidebar" id="sidebar">
+            <div class="brand-area">
+                <div>
+                    <div class="brand-text">VERTICAL</div>
+                    <small style="color:var(--text-muted); font-size:0.7rem;" id="lbl-empresa">EMPRESA</small>
+                </div>
+                <button class="btn-theme" onclick="toggleTheme()" id="btn-theme-desktop">☀</button>
+            </div>
+            <ul class="nav-list">
+                <li><button class="nav-btn admin-only" onclick="nav('dashboard', this)">📊 Dashboard</button></li>
+                <li><button class="nav-btn active" onclick="nav('lancamento', this)">📝 Lançamento</button></li>
+                <li><button class="nav-btn" onclick="nav('nuvem', this)">☁️ Lista / Nuvem</button></li>
+                <li><button class="nav-btn admin-only" onclick="nav('equipe', this)">👥 Equipe</button></li>
+                <!-- NOVO ITEM NO MENU -->
+                <li><button class="nav-btn admin-only" onclick="nav('integracao', this)">🔌 Integração</button></li>
+            </ul>
+            <div class="user-area">
+                <span class="user-email" id="lbl-user">user@mail.com</span>
+                <span style="font-size:0.7rem; color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;" id="lbl-role">CARGO</span>
+                <button class="btn btn-outline" style="padding:10px; font-size:0.8rem;" onclick="doLogout()">SAIR</button>
+                
+                <button class="delete-account-btn" onclick="showDeleteAccountModal()">
+                    🗑️ EXCLUIR MINHA CONTA
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <!-- DASHBOARD -->
+            <div id="sec-dashboard" class="section">
+                <div id="admin-filter" class="filter-bar admin-only" style="display:none;">
+                    <div>
+                        <label>Filtrar Técnico</label>
+                        <select id="filter-tech-dash" onchange="loadDashboard()">
+                            <option value="todos">Todos</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-box"><div class="kpi-lbl">Serviços</div><div class="kpi-val" id="kpi-total">0</div></div>
+                    <div class="kpi-box"><div class="kpi-lbl">Faturamento</div><div class="kpi-val" id="kpi-valor">R$ 0</div></div>
+                    <div class="kpi-box"><div class="kpi-lbl">Horas</div><div class="kpi-val" id="kpi-horas">0h</div></div>
+                </div>
+                <div class="card"><canvas id="chartLine" style="max-height:250px;"></canvas></div>
+            </div>
+
+            <!-- LANÇAMENTO -->
+            <div id="sec-lancamento" class="section active">
+                <div id="pending-alert" class="card" style="border-color:var(--warning); display:none;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="color:var(--warning);">⚠️ Você tem <strong id="pending-count">0</strong> itens pendentes para sincronizar.</span>
+                        <button class="btn btn-warning" style="width:auto; margin:0; padding:8px 15px;" onclick="nav('nuvem', document.querySelectorAll('.nav-btn')[2])">SINCRONIZAR</button>
+                    </div>
+                </div>
+
+                <div class="card" style="border-color: var(--success);">
+                    <div id="timer-idle">
+                        <button class="btn btn-success" onclick="timerToggle()">▶ INICIAR SERVIÇO</button>
+                    </div>
+                    <div id="timer-running" style="display:none;">
+                        <div class="timer-display" id="timer-clock">00:00:00</div>
+                        <button class="btn btn-danger" onclick="timerToggle()">⏹ FINALIZAR</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <div style="flex:1"><label>Início</label><input type="datetime-local" id="inp-inicio"></div>
+                        <div style="flex:1"><label>Fim</label><input type="datetime-local" id="inp-fim"></div>
+                    </div>
+
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1"><label>OM</label><input type="text" id="inp-om" placeholder="Nº da OM"></div>
+                        <div style="flex:1"><label>Patrimônio</label><input type="text" id="inp-pt" placeholder="Nº patrimônio"></div>
+                    </div>
+                    
+                    <label>Equipamento</label>
+                    <select id="sel-maq" onchange="autoFill()">
+                        <option value="">Selecione o equipamento...</option>
+                    </select>
+
+                    <button id="btn-ident" class="btn btn-outline" onclick="toggleIdent()" style="margin-top:15px; border-color:var(--primary); color:var(--primary);">
+                        🔍 IDENTIFICAÇÃO (OFF)
+                    </button>
+
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1"><label>Horas</label><input type="number" id="inp-h" step="0.1" min="0"></div>
+                        <div style="flex:1"><label>Valor R$</label><input type="number" id="inp-v" step="0.01" min="0"></div>
+                    </div>
+
+                    <div style="display:flex; gap:10px; margin-top:20px;">
+                        <label class="btn btn-outline" style="flex:1; display:flex; align-items:center; justify-content:center; margin-top:15px; border-color:var(--primary); color:var(--primary); position:relative;" id="ocr-label">
+                            <span id="ocr-text">📷 OCR</span>
+                            <input type="file" hidden accept="image/*" capture="camera" onchange="runOCR(event)">
+                        </label>
+                        <button class="btn btn-primary" style="flex:2;" onclick="saveLocal()">💾 SALVAR</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NUVEM -->
+            <div id="sec-nuvem" class="section">
+                <div class="card">
+                    <div id="admin-filter-list" class="filter-bar admin-only" style="display:none;">
+                        <div>
+                            <label>Filtrar Técnico</label>
+                            <select id="filter-tech-list" onchange="renderTable()">
+                                <option value="todos">Todos</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <button class="btn btn-primary" style="background:#3b82f6; color:#fff;" onclick="syncCloud()" id="btn-sync">☁️ SINCRONIZAR</button>
+                        <button class="btn btn-success" onclick="exportXLS()">📊 EXCEL</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="table-main">
+                            <thead><tr><th>DATA</th><th>OM</th><th>TÉCNICO</th><th>MÁQUINA</th><th>VALOR</th></tr></thead>
+                            <tbody id="table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EQUIPE -->
+            <div id="sec-equipe" class="section">
+                <div class="card">
+                    <h3 style="color:var(--primary); margin-top:0;">NOVO COLABORADOR</h3>
+                    <label>E-mail</label><input type="email" id="staff-email" placeholder="colaborador@email.com">
+                    <label>Senha Provisória</label><input type="password" id="staff-pass" placeholder="mínimo 6 caracteres">
+                    <label>Cargo</label>
+                    <select id="staff-role">
+                        <option value="tecnico">Técnico (Operacional)</option>
+                        <option value="cliente">Cliente (Consulta)</option>
+                    </select>
+                    <label>Token de Segurança</label><input type="password" id="staff-token" placeholder="Téc: 20 | Cli: 30">
+                    <button class="btn btn-success" onclick="addStaff()" id="btn-add-staff">CADASTRAR</button>
+                </div>
+            </div>
+
+            <!-- INTEGRAÇÃO (NOVA SEÇÃO) -->
+            <div id="sec-integracao" class="section">
+                <div class="card">
+                    <h3 style="color:var(--primary);">🔌 Configurar Integração com API</h3>
+                    <p>Defina abaixo a URL da API e sua chave de acesso. Essas informações serão salvas no banco e ficarão disponíveis para administradores da empresa.</p>
+                    
+                    <label>URL da API</label>
+                    <input type="url" id="config-api-url" placeholder="https://sua-api.com/endpoint" value="">
+
+                    <label>Chave da API</label>
+                    <input type="text" id="config-api-key" placeholder="Sua chave" value="">
+
+                    <div style="display:flex; gap:10px; margin-top:20px;">
+                        <button class="btn btn-success" onclick="saveApiConfig()">💾 Salvar Configuração</button>
+                        <button class="btn btn-outline" onclick="loadApiConfig()">↻ Recarregar</button>
+                    </div>
+
+                    <hr style="border-color:var(--border); margin:20px 0;">
+
+                    <h4>📘 Instruções para Power BI</h4>
+                    <ol style="color:var(--text-muted);">
+                        <li>No Power BI Desktop, clique em "Obter Dados" > "Web".</li>
+                        <li>Insira a URL: <strong id="sample-url">[URL configurada]</strong></li>
+                        <li>Escolha "Anônimo" e clique em "Conectar".</li>
+                        <li>Na visualização, você verá a lista de serviços. Clique em "Carregar".</li>
+                    </ol>
+                    <p style="color:var(--warning);">⚠️ Mantenha sua chave em segredo. Qualquer pessoa com ela pode acessar todos os dados da sua empresa.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODALS (Confirmação e Exclusão) -->
+    <div id="modal-confirm" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-title">📋 CONFIRMAR SERVIÇO</div>
+            <div class="modal-row">OM: <span id="conf-om">---</span></div>
+            <div class="modal-row">Patrimônio: <span id="conf-pt">---</span></div>
+            <div class="modal-row">Equipamento: <span id="conf-maq">---</span></div>
+            <div class="modal-row">Horas: <span id="conf-h">0</span></div>
+            <div class="modal-row">Valor Base: <span id="conf-v-base">R$ 0,00</span></div>
+            <div class="modal-row">Identificação (+50%): <span id="conf-ident">NÃO</span></div>
+            <div class="modal-row" style="border-bottom: 2px solid var(--primary);">Valor Final: <span id="conf-v-final" style="color:var(--success); font-size:1.2rem;">R$ 0,00</span></div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" style="border-color:var(--danger); color:var(--danger);" onclick="closeModal()">✖ CORRIGIR</button>
+                <button class="btn btn-success" onclick="finalSave()">✅ CONFIRMAR</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-delete-account" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-title" style="color: var(--danger);">⚠️ EXCLUIR CONTA</div>
+            <p style="color: var(--text-muted); margin-bottom: 20px; text-align: center;">
+                Esta ação é <strong style="color: var(--danger);">IRREVERSÍVEL</strong>.<br>
+                Todos os seus serviços serão removidos permanentemente.
+            </p>
+            <label>Confirme sua senha para continuar:</label>
+            <input type="password" id="delete-password" placeholder="Sua senha" style="margin-top: 10px;">
+            <div class="modal-actions" style="margin-top: 25px;">
+                <button class="btn btn-outline" onclick="closeDeleteModal()">CANCELAR</button>
+                <button class="btn btn-danger" onclick="deleteAccount()" id="btn-delete-confirm">🗑️ EXCLUIR</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURAÇÃO SUPABASE ---
+        const SB_URL = 'https://lojsolovdshbzekkqtwz.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvanNvbG92ZHNoYnpla2txdHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMTc0ODksImV4cCI6MjA4NTc5MzQ4OX0.YpgXR13DaDqgmTCiBgznKCaDvSjn9YkFiq49yHKrW3o';
+        
+        // --- LISTA DE EQUIPAMENTOS (mantida) ---
+        const MAQUINAS = [
+            { nome: "ACABADORA DE SUPERF", valor: 2.00, horas: 5.0 },
+            { nome: "BALANCIM CADEIRINHA", valor: 2.00, horas: 2.25 },
+            { nome: "BANCADA DE SERRA", valor: 8.00, horas: 4.5 },
+            { nome: "BETONEIRA 150 LT", valor: 6.00, horas: 4.5 },
+            { nome: "BETONEIRA 400LT", valor: 6.00, horas: 4.5 },
+            { nome: "BETONEIRA 600LT", valor: 16.90, horas: 16.0 },
+            { nome: "BOMBA MANGOTE", valor: 4.00, horas: 3.0 },
+            { nome: "BOMBA SUBMERSA", valor: 4.00, horas: 4.0 },
+            { nome: "COMPACTADOR", valor: 3.00, horas: 4.0 },
+            { nome: "CORTADORA", valor: 3.00, horas: 4.0 },
+            { nome: "GERADOR", valor: 3.00, horas: 3.2 },
+            { nome: "GUINCHO DE ELEVAÇÃO", valor: 10.00, horas: 6.0 },
+            { nome: "MARTELO 2 KG - 220V", valor: 1.50, horas: 2.0 },
+            { nome: "MARTELO 5,7 KG-220V", valor: 1.50, horas: 2.0 },
+            { nome: "MARTELO 6 KG - 220V", valor: 1.70, horas: 2.0 },
+            { nome: "MARTELO 11 KG - ROT", valor: 2.00, horas: 2.2 },
+            { nome: "MARTELO 11 KG - 220V", valor: 1.70, horas: 2.2 },
+            { nome: "MARTELO 16/19 KG", valor: 2.00, horas: 2.3 },
+            { nome: "MARTELO 19 KG - 220V", valor: 2.00, horas: 2.5 },
+            { nome: "MARTELO 30 KG - 220V", valor: 2.00, horas: 2.5 },
+            { nome: "MINI GRUA", valor: 10.00, horas: 6.0 },
+            { nome: "MOTOR - ACIONADOR", valor: 3.00, horas: 3.0 },
+            { nome: "MOTOR - ELET_TRIFA", valor: 3.00, horas: 3.0 },
+            { nome: "PLACA VIBRATORIA", valor: 3.50, horas: 4.5 },
+            { nome: "REGUA VIBRATORIA", valor: 5.00, horas: 4.5 },
+            { nome: "TORRE DE ILUMINACAO", valor: 25.00, horas: 6.0 },
+            { nome: "UNIDADES HIDRAULICA", valor: 8.00, horas: 16.0 },
+            { nome: "VIBRADOR DE IMERSAO", valor: 2.80, horas: 4.0 },
+            { nome: "ROLO COMPACTADOR", valor: 20.00, horas: 24.0 },
+            { nome: "MINI CARREGADEIRA", valor: 34.00, horas: 16.0 },
+            { nome: "MINI ESCAVADEIRA", valor: 34.00, horas: 16.0 },
+            { nome: "VELOX", valor: 8.00, horas: 6.0 },
+            { nome: "PERFURATRIZ", valor: 25.00, horas: 6.0 },
+            { nome: "MAQUINA PESADA", valor: 34.00, horas: 16.0 }
+        ];
+
+        // --- ESTADO GLOBAL ---
+        let store = {
+            sb: null,
+            user: null,
+            profile: null,
+            localData: [],
+            cloudData: [],
+            timer: null,
+            timerStart: null,
+            charts: {},
+            isIdent: false,
+            tempItem: null
+        };
+
+        // --- INICIALIZAÇÃO ---
+        window.onload = async () => {
+            loadTheme();
+            
+            try {
+                store.localData = JSON.parse(localStorage.getItem('oficina_db')) || [];
+            } catch {
+                store.localData = [];
+            }
+            
+            const savedTimer = localStorage.getItem('t_start');
+            if (savedTimer) {
+                store.timerStart = savedTimer;
+                startTimer();
+            }
+            
+            const sel = document.getElementById('sel-maq');
+            MAQUINAS.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.nome;
+                opt.textContent = m.nome;
+                sel.appendChild(opt);
+            });
+
+            let p = 0;
+            const bar = document.getElementById('progress');
+            const itv = setInterval(() => {
+                p += 5;
+                bar.style.width = p + '%';
+                if (p >= 100) {
+                    clearInterval(itv);
+                    startApp();
+                }
+            }, 50);
+        };
+
+        // --- INICIALIZAÇÃO DO APP ---
+        async function startApp() {
+            try {
+                store.sb = window.supabase.createClient(SB_URL, SB_KEY);
+                const { data: { session } } = await store.sb.auth.getSession();
+                if (session) {
+                    await loadProfile(session.user);
+                } else {
+                    showScreen('auth');
+                }
+            } catch (e) {
+                console.error('Erro ao conectar:', e);
+                alert('Erro de conexão. Modo offline ativado.');
+                store.profile = { role: 'tecnico', empresa_id: null, empresa_nome: 'Local' };
+                showScreen('app');
+                nav('lancamento', document.querySelectorAll('.nav-btn')[1]);
+                updatePendingAlert();
+            }
+        }
+
+        // --- CARREGA PERFIL E DADOS DA NUVEM ---
+        async function loadProfile(user) {
+            store.user = user;
+            try {
+                const { data, error } = await store.sb
+                    .from('perfis')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single();
+                if (error) throw error;
+                store.profile = data;
+            } catch {
+                store.profile = { role: 'tecnico', empresa_id: null, empresa_nome: 'Local' };
+            }
+            
+            document.getElementById('lbl-user').innerText = user.email;
+            document.getElementById('lbl-empresa').innerText = (store.profile.empresa_nome || 'SaaS').toUpperCase();
+            document.getElementById('lbl-role').innerText = store.profile.role.toUpperCase();
+            
+            const adminOnly = document.querySelectorAll('.admin-only');
+            
+            if (store.profile.role === 'admin') {
+                adminOnly.forEach(e => e.style.display = 'block');
+                nav('dashboard', document.querySelectorAll('.nav-btn')[0]);
+            } else {
+                adminOnly.forEach(e => e.style.display = 'none');
+                nav('lancamento', document.querySelectorAll('.nav-btn')[1]);
+            }
+            
+            updatePendingAlert();
+            await loadCloudData();
+            renderTable();
+            showScreen('app');
+        }
+
+        // --- CARREGAR DADOS DA NUVEM ---
+        async function loadCloudData() {
+            if (!store.sb || !store.profile?.empresa_id) return;
+
+            try {
+                const { data, error } = await store.sb
+                    .from('servicos')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                store.cloudData = data || [];
+
+                if (store.profile.role === 'admin') {
+                    updateTechFilters();
+                }
+            } catch (e) {
+                console.error("Erro ao carregar nuvem:", e);
+            }
+        }
+
+        function updateTechFilters() {
+            const techs = [...new Set(store.cloudData.map(i => i.tecnico))].filter(t => t);
+            
+            const dashSelect = document.getElementById('filter-tech-dash');
+            const listSelect = document.getElementById('filter-tech-list');
+            
+            const optionsHTML = '<option value="todos">Todos</option>' + 
+                techs.map(t => `<option value="${t}">${t.split('@')[0]}</option>`).join('');
+            
+            dashSelect.innerHTML = optionsHTML;
+            listSelect.innerHTML = optionsHTML;
+        }
+
+        function updatePendingAlert() {
+            const count = store.localData.length;
+            const alertDiv = document.getElementById('pending-alert');
+            const countSpan = document.getElementById('pending-count');
+            
+            if (count > 0) {
+                alertDiv.style.display = 'block';
+                countSpan.innerText = count;
+            } else {
+                alertDiv.style.display = 'none';
+            }
+        }
+
+        // --- TEMA ---
+        function toggleTheme() {
+            const current = document.body.getAttribute('data-theme');
+            const next = current === 'light' ? 'dark' : 'light';
+            document.body.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            updateThemeIcons(next);
+            if (document.getElementById('sec-dashboard').classList.contains('active')) {
+                loadDashboard();
+            }
+        }
+
+        function loadTheme() {
+            const s = localStorage.getItem('theme') || 'dark';
+            document.body.setAttribute('data-theme', s);
+            updateThemeIcons(s);
+        }
+
+        function updateThemeIcons(t) {
+            const i = t === 'light' ? '🌙' : '☀';
+            document.getElementById('btn-theme-desktop').innerText = i;
+            document.getElementById('btn-theme-mobile').innerText = i;
+        }
+
+        function showScreen(s) {
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('auth-view').style.display = s === 'auth' ? 'flex' : 'none';
+            document.getElementById('app-view').style.display = s === 'app' ? 'flex' : 'none';
+            if (window.innerWidth <= 768 && s === 'app') {
+                document.getElementById('mobile-header').style.display = 'flex';
+            }
+        }
+
+        // --- NAVEGAÇÃO (modificada para incluir integracao) ---
+        function nav(id, btn) {
+            if ((id === 'equipe' || id === 'integracao') && store.profile?.role !== 'admin') {
+                alert('Acesso negado');
+                return;
+            }
+            
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById('sec-' + id).classList.add('active');
+            
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            
+            if (window.innerWidth <= 768) closeSidebar();
+            
+            if (id === 'dashboard') loadDashboard();
+            if (id === 'nuvem') renderTable();
+            if (id === 'integracao') loadApiConfig(); // Carrega configurações ao entrar
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+            document.getElementById('sidebar-backdrop').classList.toggle('active');
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('active');
+            document.getElementById('sidebar-backdrop').classList.remove('active');
+        }
+
+        // --- TIMER E LANÇAMENTO (inalterados) ---
+        function startTimer() {
+            if (store.timer) clearInterval(store.timer);
+            document.getElementById('timer-idle').style.display = 'none';
+            document.getElementById('timer-running').style.display = 'block';
+            store.timer = setInterval(() => {
+                const diff = new Date() - new Date(localStorage.getItem('t_start'));
+                const h = Math.floor(diff / 3600000);
+                const m = Math.floor((diff % 3600000) / 60000);
+                const s = Math.floor((diff % 60000) / 1000);
+                document.getElementById('timer-clock').innerText = 
+                    `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        function timerToggle() {
+            if (!store.timer) {
+                const now = new Date();
+                localStorage.setItem('t_start', now.toISOString());
+                const off = now.getTimezoneOffset() * 60000;
+                document.getElementById('inp-inicio').value = (new Date(now - off)).toISOString().slice(0, 16);
+                startTimer();
+            } else {
+                clearInterval(store.timer);
+                store.timer = null;
+                const start = new Date(localStorage.getItem('t_start'));
+                const hrs = (new Date() - start) / 3600000;
+                document.getElementById('inp-h').value = Math.max(0, hrs.toFixed(2));
+                const now = new Date();
+                const off = now.getTimezoneOffset() * 60000;
+                document.getElementById('inp-fim').value = (new Date(now - off)).toISOString().slice(0, 16);
+                localStorage.removeItem('t_start');
+                document.getElementById('timer-idle').style.display = 'block';
+                document.getElementById('timer-running').style.display = 'none';
+                autoFill();
+            }
+        }
+
+        function toggleIdent() {
+            store.isIdent = !store.isIdent;
+            const btn = document.getElementById('btn-ident');
+            if (store.isIdent) {
+                btn.innerText = '✅ IDENTIFICAÇÃO ATIVA (+50%)';
+                btn.style.background = 'var(--primary)';
+                btn.style.color = '#000';
+            } else {
+                btn.innerText = '🔍 IDENTIFICAÇÃO (OFF)';
+                btn.style.background = 'transparent';
+                btn.style.color = 'var(--primary)';
+            }
+            autoFill();
+        }
+
+        function autoFill() {
+            const m = MAQUINAS.find(x => x.nome === document.getElementById('sel-maq').value);
+            if (m) {
+                const hField = document.getElementById('inp-h');
+                if (!hField.value || hField.value == 0) hField.value = m.horas;
+                let v = m.valor;
+                if (store.isIdent) v = v * 1.5;
+                document.getElementById('inp-v').value = v.toFixed(2);
+            }
+        }
+
+        function saveLocal() {
+            const om = document.getElementById('inp-om').value.trim();
+            const pt = document.getElementById('inp-pt').value.trim() || 'S/N';
+            const maq = document.getElementById('sel-maq').value;
+            const h = parseFloat(document.getElementById('inp-h').value) || 0;
+            const v = parseFloat(document.getElementById('inp-v').value) || 0;
+            
+            if (!om) return alert('❌ OM é obrigatória');
+            if (!maq) return alert('❌ Selecione um equipamento');
+            if (h <= 0) return alert('❌ Horas devem ser maiores que zero');
+            if (v <= 0) return alert('❌ Valor deve ser maior que zero');
+
+            const valorBase = MAQUINAS.find(x => x.nome === maq)?.valor || v;
+            const valorFinal = store.isIdent ? valorBase * 1.5 : valorBase;
+
+            store.tempItem = {
+                id: Date.now(),
+                empresa_id: store.profile?.empresa_id || null,
+                tecnico: store.user?.email || 'offline@local',
+                om: om,
+                patrimonio: pt,
+                equipamento: maq,
+                horas: h,
+                valor: valorFinal,
+                valor_base: valorBase,
+                inicio: document.getElementById('inp-inicio').value,
+                fim: document.getElementById('inp-fim').value,
+                identificacao: store.isIdent,
+                data: new Date().toLocaleDateString('pt-BR'),
+                created_at: new Date().toISOString()
+            };
+
+            document.getElementById('conf-om').innerText = store.tempItem.om;
+            document.getElementById('conf-pt').innerText = store.tempItem.patrimonio;
+            document.getElementById('conf-maq').innerText = store.tempItem.equipamento;
+            document.getElementById('conf-h').innerText = store.tempItem.horas.toFixed(1) + 'h';
+            document.getElementById('conf-v-base').innerHTML = `R$ ${store.tempItem.valor_base.toFixed(2)}`;
+            document.getElementById('conf-ident').innerText = store.tempItem.identificacao ? 'SIM' : 'NÃO';
+            document.getElementById('conf-v-final').innerHTML = `R$ ${store.tempItem.valor.toFixed(2)}`;
+            
+            document.getElementById('modal-confirm').classList.add('open');
+        }
+
+        function closeModal() {
+            document.getElementById('modal-confirm').classList.remove('open');
+            store.tempItem = null;
+        }
+
+        function finalSave() {
+            if (!store.tempItem) return;
+            
+            store.localData.unshift(store.tempItem);
+            localStorage.setItem('oficina_db', JSON.stringify(store.localData));
+            
+            updatePendingAlert();
+            renderTable();
+            closeModal();
+            
+            document.getElementById('inp-om').value = '';
+            document.getElementById('inp-pt').value = '';
+            document.getElementById('sel-maq').value = '';
+            document.getElementById('inp-h').value = '';
+            document.getElementById('inp-v').value = '';
+            document.getElementById('inp-inicio').value = '';
+            document.getElementById('inp-fim').value = '';
+            
+            alert('✅ Serviço salvo localmente!');
+        }
+
+        function sanitize(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+            
+            let filterValue = 'todos';
+            if (store.profile?.role === 'admin') {
+                filterValue = document.getElementById('filter-tech-list').value;
+            }
+
+            let displayData = store.cloudData;
+
+            if (store.profile?.role === 'admin' && filterValue !== 'todos') {
+                displayData = displayData.filter(i => i.tecnico === filterValue);
+            }
+
+            displayData.forEach(i => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${sanitize(i.data || new Date(i.created_at).toLocaleDateString('pt-BR'))}</td>
+                    <td>${sanitize(i.om)}</td>
+                    <td>${sanitize(i.tecnico?.split('@')[0] || 'N/A')}</td>
+                    <td>${sanitize(i.equipamento)}</td>
+                    <td>R$ ${(i.valor || 0).toFixed(2)}</td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            let pendingToShow = store.localData;
+            if (filterValue !== 'todos') {
+                pendingToShow = store.localData.filter(i => i.tecnico === filterValue);
+            }
+
+            if (pendingToShow.length > 0) {
+                const header = document.createElement('tr');
+                header.innerHTML = `<td colspan="5" style="background:var(--warning); color:#000; text-align:center; font-weight:bold;">⏳ PENDENTES (${pendingToShow.length})</td>`;
+                tbody.prepend(header);
+
+                pendingToShow.forEach(i => {
+                    const row = document.createElement('tr');
+                    row.style.background = 'rgba(245, 158, 11, 0.1)';
+                    row.innerHTML = `
+                        <td>${sanitize(i.data)}</td>
+                        <td>${sanitize(i.om)}</td>
+                        <td>${sanitize(i.tecnico?.split('@')[0] || 'N/A')} (Local)</td>
+                        <td>${sanitize(i.equipamento)}</td>
+                        <td>R$ ${(i.valor || 0).toFixed(2)}</td>
+                    `;
+                    tbody.insertBefore(row, header.nextSibling);
+                });
+            }
+        }
+
+        async function syncCloud() {
+            if (!store.sb) {
+                alert('❌ Modo offline: não é possível sincronizar');
+                return;
+            }
+            
+            if (store.localData.length === 0) {
+                alert('Nenhum dado novo para sincronizar.\n\nAtualizando dados da nuvem...');
+                await loadCloudData();
+                renderTable();
+                return;
+            }
+            
+            const btn = document.getElementById('btn-sync');
+            btn.disabled = true;
+            btn.innerText = '⏳ SINCRONIZANDO...';
+            
+            try {
+                const { error } = await store.sb.from('servicos').insert(
+                    store.localData.map(i => ({
+                        empresa_id: i.empresa_id,
+                        tecnico: i.tecnico,
+                        om: i.om,
+                        patrimonio: i.patrimonio,
+                        equipamento: i.equipamento,
+                        horas: i.horas,
+                        valor: i.valor,
+                        identificacao: i.identificacao,
+                        data_inicio: i.inicio,
+                        data_fim: i.fim,
+                        status: 'concluido',
+                        created_at: i.created_at || new Date().toISOString()
+                    }))
+                );
+                
+                if (error) throw error;
+                
+                alert('✅ Dados enviados com sucesso!');
+                store.localData = [];
+                localStorage.setItem('oficina_db', '[]');
+                
+                await loadCloudData();
+                updatePendingAlert();
+                renderTable();
+                
+            } catch (error) {
+                alert('❌ Erro ao sincronizar: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '☁️ SINCRONIZAR';
+            }
+        }
+
+        async function loadDashboard() {
+            let source = store.cloudData;
+            
+            if (store.profile?.role === 'admin') {
+                const filterVal = document.getElementById('filter-tech-dash').value;
+                if (filterVal !== 'todos') {
+                    source = source.filter(i => i.tecnico === filterVal);
+                }
+            }
+            
+            document.getElementById('kpi-total').innerText = source.length;
+            document.getElementById('kpi-valor').innerHTML = 'R$ ' + 
+                source.reduce((a, b) => a + (b.valor || 0), 0).toFixed(0);
+            document.getElementById('kpi-horas').innerText = 
+                source.reduce((a, b) => a + (b.horas || 0), 0).toFixed(0) + 'h';
+            
+            const days = {};
+            source.forEach(i => {
+                let dStr = i.created_at;
+                try {
+                    const dObj = new Date(dStr);
+                    if (!isNaN(dObj)) dStr = dObj.toLocaleDateString('pt-BR');
+                } catch {}
+                days[dStr] = (days[dStr] || 0) + 1;
+            });
+
+            const isLight = document.body.getAttribute('data-theme') === 'light';
+            const color = isLight ? '#334155' : '#94a3b8';
+            
+            if (store.charts.line) store.charts.line.destroy();
+            
+            store.charts.line = new Chart(document.getElementById('chartLine'), {
+                type: 'line',
+                data: {
+                    labels: Object.keys(days),
+                    datasets: [{
+                        label: 'Serviços por Dia',
+                        data: Object.values(days),
+                        borderColor: '#ffcc00',
+                        backgroundColor: 'rgba(255,204,0,0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color } },
+                        y: { ticks: { color } }
+                    },
+                    plugins: {
+                        legend: { labels: { color } }
+                    }
+                }
+            });
+        }
+
+        async function runOCR(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const label = document.getElementById('ocr-text');
+            const originalText = label.innerText;
+            label.innerText = '📷 PROCESSANDO OCR...';
+            
+            try {
+                const worker = await Tesseract.createWorker('por');
+                const { data: { text } } = await worker.recognize(file);
+                await worker.terminate();
+                
+                const matches = text.match(/\d{4,}/g);
+                if (matches && matches.length > 0) {
+                    document.getElementById('inp-om').value = matches[0];
+                    label.innerText = '✅ OCR CONCLUÍDO';
+                    setTimeout(() => { label.innerText = originalText; }, 2000);
+                } else {
+                    label.innerText = '❌ NENHUM NÚMERO ENCONTRADO';
+                    setTimeout(() => { label.innerText = originalText; }, 2000);
+                }
+            } catch (error) {
+                console.error('OCR error:', error);
+                label.innerText = '❌ ERRO NO OCR';
+                setTimeout(() => { label.innerText = originalText; }, 2000);
+            }
+            event.target.value = '';
+        }
+
+        function exportXLS() {
+            let source = store.cloudData;
+            if (source.length === 0 && store.localData.length === 0) {
+                alert('Nenhum dado para exportar');
+                return;
+            }
+            const allData = [...store.localData, ...source];
+            const exportData = allData.map(i => ({
+                OM: i.om,
+                Patrimônio: i.patrimonio,
+                Equipamento: i.equipamento,
+                Horas: i.horas,
+                'Valor (R$)': i.valor,
+                Identificação: i.identificacao ? 'SIM' : 'NÃO',
+                Técnico: i.tecnico,
+                Data: i.data || new Date(i.created_at).toLocaleDateString('pt-BR')
+            }));
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Serviços');
+            XLSX.writeFile(wb, `relatorio_${new Date().getTime()}.xlsx`);
+        }
+
+        // --- AUTH (modificada) ---
+        async function doLogin() {
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-pass').value;
+            if (!email || !pass) return alert('Preencha e-mail e senha');
+            const btn = document.getElementById('btn-login');
+            btn.disabled = true;
+            btn.innerText = 'ENTRANDO...';
+            try {
+                const { data, error } = await store.sb.auth.signInWithPassword({ email, password: pass });
+                if (error) throw error;
+                await loadProfile(data.user);
+            } catch (error) {
+                alert('Erro no login: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'ENTRAR';
+            }
+        }
+
+        // --- NOVA VERSÃO DO REGISTER (com campos de API) ---
+        async function doRegister() {
+            const token = document.getElementById('reg-token').value;
+            if (token !== '10') return alert('Token de segurança inválido');
+
+            const nome = document.getElementById('reg-empresa').value;
+            const email = document.getElementById('reg-email').value;
+            const pass = document.getElementById('reg-pass').value;
+            const apiUrl = document.getElementById('reg-api-url').value.trim();
+            const apiKey = document.getElementById('reg-api-key').value.trim();
+
+            if (!nome || !email || !pass) return alert('Preencha todos os campos obrigatórios');
+            if (pass.length < 6) return alert('Senha deve ter no mínimo 6 caracteres');
+            if (!apiUrl || !apiKey) return alert('URL da API e Chave são obrigatórias para integração');
+
+            const btn = document.getElementById('btn-register');
+            btn.disabled = true;
+            btn.innerText = 'CADASTRANDO...';
+
+            try {
+                // 1. Criar usuário no Auth
+                const { data: authData, error: authError } = await store.sb.auth.signUp({
+                    email,
+                    password: pass,
+                    options: {
+                        data: {
+                            intended_role: 'admin',
+                            company_name: nome
+                        }
+                    }
+                });
+
+                if (authError) throw authError;
+                if (!authData.user) throw new Error('Falha ao criar usuário');
+
+                // 2. Inserir a empresa na tabela 'empresas'
+                const { data: empresaData, error: empresaError } = await store.sb
+                    .from('empresas')
+                    .insert({ nome: nome })
+                    .select('id')
+                    .single();
+
+                if (empresaError) throw empresaError;
+
+                const empresaId = empresaData.id;
+
+                // 3. Atualizar o perfil do usuário com empresa_id e role (se o trigger não fez)
+                const { error: perfilError } = await store.sb
+                    .from('perfis')
+                    .upsert({
+                        id: authData.user.id,
+                        empresa_id: empresaId,
+                        role: 'admin',
+                        empresa_nome: nome
+                    });
+
+                if (perfilError) throw perfilError;
+
+                // 4. Inserir configurações da API
+                const { error: configError } = await store.sb
+                    .from('configuracoes')
+                    .insert({
+                        empresa_id: empresaId,
+                        api_url: apiUrl,
+                        api_key: apiKey,
+                        updated_at: new Date().toISOString()
+                    });
+
+                if (configError) throw configError;
+
+                alert('✅ Empresa criada com sucesso! Verifique seu e-mail para confirmar.');
+                toggleAuth(false); // Volta para o login
+            } catch (error) {
+                alert('Erro no cadastro: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'CADASTRAR';
+            }
+        }
+
+        function toggleAuth(showRegister) {
+            document.getElementById('form-login').style.display = showRegister ? 'none' : 'block';
+            document.getElementById('form-register').style.display = showRegister ? 'block' : 'none';
+        }
+
+        function doLogout() {
+            if (store.sb) store.sb.auth.signOut();
+            localStorage.clear();
+            location.reload();
+        }
+
+        async function addStaff() {
+            if (store.profile?.role !== 'admin') return alert('Acesso negado');
+            const token = document.getElementById('staff-token').value;
+            const role = document.getElementById('staff-role').value; 
+            if (role === 'tecnico' && token !== '20') return alert('Para TÉCNICO o token é 20');
+            if (role === 'cliente' && token !== '30') return alert('Para CLIENTE o token é 30');
+            const email = document.getElementById('staff-email').value;
+            const pass = document.getElementById('staff-pass').value;
+            if (!email || !pass) return alert('Preencha e-mail e senha');
+            if (pass.length < 6) return alert('Senha deve ter no mínimo 6 caracteres');
+            const btn = document.getElementById('btn-add-staff');
+            btn.disabled = true;
+            btn.innerText = 'CADASTRANDO...';
+            try {
+                const { data, error } = await store.sb.auth.signUp({
+                    email, password: pass,
+                    options: { data: { role, empresa_id: store.profile.empresa_id, empresa_nome: store.profile.empresa_nome } }
+                });
+                if (error) throw error;
+                if (data.user) {
+                    alert('✅ Colaborador cadastrado!');
+                    document.getElementById('staff-email').value = '';
+                    document.getElementById('staff-pass').value = '';
+                    document.getElementById('staff-token').value = '';
+                }
+            } catch (error) {
+                alert('Erro ao cadastrar: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'CADASTRAR';
+            }
+        }
+
+        // --- EXCLUSÃO DE CONTA ---
+        function showDeleteAccountModal() {
+            if (!store.user) return;
+            document.getElementById('delete-password').value = '';
+            document.getElementById('modal-delete-account').classList.add('open');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('modal-delete-account').classList.remove('open');
+        }
+
+        async function deleteAccount() {
+            const password = document.getElementById('delete-password').value;
+            if (!password) return alert('Digite sua senha');
+            const btn = document.getElementById('btn-delete-confirm');
+            btn.disabled = true;
+            btn.innerText = '⏳ EXCLUINDO...';
+            try {
+                const { error: signInError } = await store.sb.auth.signInWithPassword({ email: store.user.email, password });
+                if (signInError) throw new Error('Senha incorreta');
+                const { error: rpcError } = await store.sb.rpc('delete_user_account');
+                if (rpcError) throw rpcError;
+                localStorage.clear();
+                await store.sb.auth.signOut();
+                alert('✅ Conta excluída.');
+                location.reload();
+            } catch (error) {
+                alert('❌ Erro: ' + error.message);
+                btn.disabled = false;
+                btn.innerText = '🗑️ EXCLUIR';
+            }
+        }
+
+        // ===== FUNÇÕES PARA INTEGRAÇÃO =====
+        async function saveApiConfig() {
+            const apiUrl = document.getElementById('config-api-url').value.trim();
+            const apiKey = document.getElementById('config-api-key').value.trim();
+
+            if (!apiUrl || !apiKey) {
+                alert('Preencha a URL e a chave da API');
+                return;
+            }
+
+            if (!store.profile?.empresa_id) {
+                alert('Empresa não identificada. Faça login como admin.');
+                return;
+            }
+
+            try {
+                const { error } = await store.sb
+                    .from('configuracoes')
+                    .upsert({
+                        empresa_id: store.profile.empresa_id,
+                        api_url: apiUrl,
+                        api_key: apiKey,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'empresa_id' });
+
+                if (error) throw error;
+
+                alert('Configurações salvas com sucesso!');
+                updateSampleUrl();
+            } catch (err) {
+                alert('Erro ao salvar: ' + err.message);
+            }
+        }
+
+        async function loadApiConfig() {
+            if (!store.profile?.empresa_id) return;
+
+            try {
+                const { data, error } = await store.sb
+                    .from('configuracoes')
+                    .select('api_url, api_key')
+                    .eq('empresa_id', store.profile.empresa_id)
+                    .maybeSingle();
+
+                if (error) throw error;
+
+                if (data) {
+                    document.getElementById('config-api-url').value = data.api_url || '';
+                    document.getElementById('config-api-key').value = data.api_key || '';
+                } else {
+                    document.getElementById('config-api-url').value = '';
+                    document.getElementById('config-api-key').value = '';
+                }
+                updateSampleUrl();
+            } catch (err) {
+                console.error('Erro ao carregar configurações:', err);
+            }
+        }
+
+        function updateSampleUrl() {
+            const url = document.getElementById('config-api-url').value;
+            const key = document.getElementById('config-api-key').value;
+            const sampleSpan = document.getElementById('sample-url');
+            if (url && key) {
+                sampleSpan.innerText = url + '?api_key=' + key;
+            } else {
+                sampleSpan.innerText = '[URL configurada]';
+            }
+        }
+
+        // EXPOR FUNÇÕES GLOBAIS
+        window.toggleTheme = toggleTheme;
+        window.nav = nav;
+        window.toggleSidebar = toggleSidebar;
+        window.closeSidebar = closeSidebar;
+        window.toggleIdent = toggleIdent;
+        window.timerToggle = timerToggle;
+        window.autoFill = autoFill;
+        window.saveLocal = saveLocal;
+        window.closeModal = closeModal;
+        window.finalSave = finalSave;
+        window.syncCloud = syncCloud;
+        window.exportXLS = exportXLS;
+        window.runOCR = runOCR;
+        window.doLogin = doLogin;
+        window.doRegister = doRegister;
+        window.toggleAuth = toggleAuth;
+        window.doLogout = doLogout;
+        window.addStaff = addStaff;
+        window.showDeleteAccountModal = showDeleteAccountModal;
+        window.closeDeleteModal = closeDeleteModal;
+        window.deleteAccount = deleteAccount;
+        window.loadDashboard = loadDashboard;
+        window.renderTable = renderTable;
+        window.saveApiConfig = saveApiConfig;
+        window.loadApiConfig = loadApiConfig;
+        window.updateSampleUrl = updateSampleUrl;
+
+        // Adicionar event listeners para atualizar exemplo em tempo real
+        if (document.getElementById('config-api-url')) {
+            document.getElementById('config-api-url').addEventListener('input', updateSampleUrl);
+            document.getElementById('config-api-key').addEventListener('input', updateSampleUrl);
+        }
+    </script>
+</body>
+  </html>
